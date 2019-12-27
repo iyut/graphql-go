@@ -1,0 +1,15 @@
+{
+	"general" 	: {
+		"prefix_url" 	: "/api"
+	},
+	"database" : [
+		{
+			"name" 		: "mysql",
+			"username"	: "root",
+			"password" 	: "pass123qwe",
+			"host" 		: "127.0.0.1",
+			"port" 		: "3306",
+			"dbname" 	: "wp_administrator"
+		}
+	]
+}
