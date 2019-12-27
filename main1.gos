@@ -14,75 +14,22 @@ const schemaString = `
 	schema {
 		query: Query
 	}
-
-	type User {
-		userID: ID!
-		username: String!
-		email: String!
-		posts: [Post!]!
-	}
-
-	type Post{
-		postID: ID!
-		title: String!
-	}
-
 	# Define what the queries are capable of:
 	type Query {
-		# List Users:
-		users: [User!]!
-		# Get User:
-		user(userID: ID!): User!
-		#List Post per User:
-		postsByUser(userID: ID!): [Post!]!
-		#Get Post:
-		post(postID: ID!): Post!
+		# Generic greeting, e.g. "Hello, world!":
+		greet: String!
+		# Customized greeting, e.g. "Hello, Johan!":
+		greetPerson(person: String!): String!
+		# More customized greeting, e.g. "Good morning, Johan!":
+		greetPersonTimeOfDay(person: String!, timeOfDay: TimeOfDay!): String!
+	}
+	# Enumerate times of day:
+	enum TimeOfDay {
+		MORNING
+		AFTERNOON
+		EVENING
 	}
 `
-
-type User struct {
-	UserID   graphql.ID
-	Username string
-	Email    string
-	Posts    []Post
-}
-
-type Post struct {
-	PostID graphql.ID
-	Title  string
-}
-
-// Define mock data:
-var users = []User{
-	{
-		UserID:   graphql.ID("u-001"),
-		Username: "nyxerys",
-		Email:    "nyxerys@nyxerys.com",
-		Posts: []Post{
-			{PostID: "n-001", Title: "Olá Mundo!"},
-			{PostID: "n-002", Title: "Olá novamente, mundo!"},
-			{PostID: "n-003", Title: "Olá, escuridão!"},
-		},
-	}, {
-		UserID:   graphql.ID("u-002"),
-		Username: "rdnkta",
-		Email:    "rdnkta@rdnkta.com",
-		Posts: []Post{
-			{PostID: "n-004", Title: "Привіт Світ!"},
-			{PostID: "n-005", Title: "Привіт ще раз, світ!"},
-			{PostID: "n-006", Title: "Привіт, темрява!"},
-		},
-	}, {
-		UserID:   graphql.ID("u-003"),
-		Username: "username_ZAYDEK",
-		Email:    "username_ZAYDEK@zaydek.com",
-		Posts: []Post{
-			{PostID: "n-007", Title: "Hello, world!"},
-			{PostID: "n-008", Title: "Hello again, world!"},
-			{PostID: "n-009", Title: "Hello, darkness!"},
-		},
-	},
-}
 
 // Define a root resolver to hook queries onto:
 type RootResolver struct{}
