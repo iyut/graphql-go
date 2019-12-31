@@ -23,9 +23,9 @@ type Query{
 }
 
 input PostInput{
-	data: String!
+	title: String!
 }
 
 type Mutation{
-	createNote(userID: ID!, post: PostInput!): Post!
+	createPost(userID: ID!, post: PostInput!): Post!
 }

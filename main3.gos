@@ -2,37 +2,12 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"os"
 
 	graphql "github.com/graph-gophers/graphql-go"
 )
-
-/****
-*********************
-GET THE SETTINGS INFO
-*********************
-****/
-type Settings struct {
-	General General  `json:"general"`
-	DBInfo  []DBInfo `json:"database"`
-}
-
-type General struct {
-	PrefixURL string `json:"prefix_url"`
-}
-
-type DBInfo struct {
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Host     string `json:"host"`
-	Port     string `json:"port"`
-	DBName   string `json:"dbname"`
-}
 
 /****
 *********************
@@ -230,20 +205,6 @@ func main() {
 
 	ctx := context.Background()
 
-	settings := openJSONFile()
-
-	//prefixURL := settings.General.PrefixURL
-	dbInfo := settings.DBInfo[0]
-
-	db, err := sql.Open(dbInfo.Name, dbInfo.Username+":"+dbInfo.Password+"@tcp("+dbInfo.Host+":"+dbInfo.Port+")/"+dbInfo.DBName)
-	//db, err := sql.Open("mysql", "root:pass123qwe@tcp(127.0.0.1:3306)/wp_administrator")
-
-	if err != nil {
-		panic(err.Error())
-	}
-
-	defer db.Close()
-
 	bstr, err := ioutil.ReadFile("./main-schema.graphql")
 	if err != nil {
 		panic(err)
@@ -395,29 +356,4 @@ func main() {
 	}
 
 	fmt.Println(string(json6))
-}
-
-func openJSONFile() Settings {
-
-	jsonFile, err := os.Open("/root/go/bin/settings.json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	var settings Settings
-
-	json.Unmarshal(byteValue, &settings)
-
-	/*
-		if err := json.Unmarshal([]byte(settings), &val); err != nil {
-			panic(err)
-		}
-	*/
-
-	return settings
 }
