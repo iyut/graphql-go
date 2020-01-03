@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
 
+	_ "github.com/go-sql-driver/mysql"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 
@@ -22,7 +24,8 @@ type Settings struct {
 }
 
 type General struct {
-	PrefixURL string `json:"prefix_url"`
+	PrefixURL     string `json:"prefix_url"`
+	GraphqlSchema string `json:"graphql_schema"`
 }
 
 type DBInfo struct {
@@ -103,52 +106,139 @@ DEFINE THE RESOLVER FOR GRAPHQL
  * 	notes: [Note!]!
  * }
  */
-type RootResolver struct{}
+type RootResolver struct {
+	db *sql.DB
+}
 
 func (r *RootResolver) Users() ([]*UserResolver, error) {
 
 	var userRxs []*UserResolver
 
-	for _, user := range users {
+	rows, err := r.db.Query(`
+		SELECT
+			ID,
+			user_login,
+			user_email
+		FROM
+			wpa_users
+	`)
+
+	if err != nil {
+		panic(err)
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+
+		user := &User{}
+		err := rows.Scan(&user.UserID, &user.Username, &user.Email)
+
+		if err != nil {
+			return nil, err
+		}
+
 		userRxs = append(userRxs, &UserResolver{user})
 	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
 	return userRxs, nil
 }
 
 func (r *RootResolver) User(args struct{ UserID graphql.ID }) (*UserResolver, error) {
 
-	for _, user := range users {
-		if args.UserID == user.UserID {
-			return &UserResolver{user}, nil
-		}
+	var useridInt int64
+	user := &User{}
+	err := r.db.QueryRow(`
+		SELECT
+			ID,
+			user_login,
+			user_email
+		FROM
+			wpa_users
+		WHERE
+			ID = ?
+	`, args.UserID).Scan(&useridInt, &user.Username, &user.Email)
+
+	useridStr := strconv.FormatInt(useridInt, 10)
+	user.UserID = graphql.ID(useridStr)
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	return &UserResolver{user}, nil
 }
 
 func (r *RootResolver) Posts(args struct{ UserID graphql.ID }) ([]*PostResolver, error) {
 
-	user, err := r.User(args)
-	if user == nil || err != nil {
+	var postIDInt int64
+	var postRxs []*PostResolver
+	rows, err := r.db.Query(`
+		SELECT
+			ID,
+			post_title
+		FROM
+			wpa_posts
+		WHERE
+			post_author = ?
+	`, args.UserID)
 
+	if err != nil {
 		return nil, err
 	}
 
-	return user.Posts(), nil
+	defer rows.Close()
+
+	for rows.Next() {
+
+		post := &Post{}
+		err := rows.Scan(&postIDInt, &post.Title)
+
+		if err != nil {
+			return nil, err
+		}
+
+		postIDStr := strconv.FormatInt(postIDInt, 10)
+		post.PostID = graphql.ID(postIDStr)
+
+		postRxs = append(postRxs, &PostResolver{post})
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return nil, err
+	}
+
+	return postRxs, nil
 }
 
 func (r *RootResolver) Post(args struct{ PostID graphql.ID }) (*PostResolver, error) {
 
-	for _, user := range users {
-		for _, post := range user.Posts {
+	var postIDInt int64
+	post := &Post{}
+	err := r.db.QueryRow(`
+		SELECT
+			ID,
+			post_title
+		FROM
+			wpa_posts
+		WHERE
+			ID = ?
+	`, args.PostID).Scan(&postIDInt, &post.Title)
 
-			if args.PostID == post.PostID {
-				return &PostResolver{post}, nil
-			}
-		}
+	if err != nil {
+		return nil, err
 	}
 
-	return nil, nil
+	postIDStr := strconv.FormatInt(postIDInt, 10)
+	post.PostID = graphql.ID(postIDStr)
+
+	return &PostResolver{post}, nil
+
 }
 
 type CreatePostArgs struct {
@@ -197,12 +287,10 @@ func (r *UserResolver) Email() string {
 	return r.u.Email
 }
 
-func (r *UserResolver) Posts() []*PostResolver {
-	var postRxs []*PostResolver
-	for _, post := range r.u.Posts {
-		postRxs = append(postRxs, &PostResolver{post})
-	}
-	return postRxs
+func (r *UserResolver) Posts() ([]*PostResolver, error) {
+	rootRxs := &RootResolver{}
+
+	return rootRxs.Posts(struct{ UserID graphql.ID }{UserID: r.u.UserID})
 }
 
 /*
@@ -244,14 +332,14 @@ func main() {
 
 	defer db.Close()
 
-	bstr, err := ioutil.ReadFile("./main-schema.graphql")
+	bstr, err := ioutil.ReadFile(settings.General.GraphqlSchema)
 	if err != nil {
 		panic(err)
 	}
 
 	schemaString := string(bstr)
 
-	schema, err := graphql.ParseSchema(schemaString, &RootResolver{})
+	schema, err := graphql.ParseSchema(schemaString, &RootResolver{db: db})
 	if err != nil {
 		panic(err)
 	}
@@ -294,7 +382,7 @@ func main() {
 			}
 		}`,
 		Variables: map[string]interface{}{
-			"userID": "u-001",
+			"userID": "1",
 		},
 	}
 
@@ -309,13 +397,13 @@ func main() {
 	q3 := ClientQuery{
 		OpName: "Posts",
 		Query: `query Posts($userID: ID!){
-			posts(userID: $userID){
-				postID
-				title
-			}
-		}`,
+				posts(userID: $userID){
+					postID
+					title
+				}
+			}`,
 		Variables: map[string]interface{}{
-			"userID": "u-002",
+			"userID": "1",
 		},
 	}
 
@@ -330,13 +418,13 @@ func main() {
 	q4 := ClientQuery{
 		OpName: "Post",
 		Query: `query Post($postID: ID!){
-			post(postID: $postID){
-				postID
-				title
-			}
-		}`,
+				post(postID: $postID){
+					postID
+					title
+				}
+			}`,
 		Variables: map[string]interface{}{
-			"postID": "n-007",
+			"postID": "1",
 		},
 	}
 
@@ -351,11 +439,11 @@ func main() {
 	q5 := ClientQuery{
 		OpName: "CreatePost",
 		Query: `mutation CreatePost($userID: ID!, $post: PostInput!){
-			createPost(userID: $userID, post: $post){
-				postID,
-				title
-			}
-		}`,
+				createPost(userID: $userID, post: $post){
+					postID,
+					title
+				}
+			}`,
 		Variables: JSON{
 			"userID": "u-0003",
 			"post": JSON{
@@ -375,16 +463,16 @@ func main() {
 	q6 := ClientQuery{
 		OpName: "Users",
 		Query: `query Users{
-			users{
-				userID
-				username
-				email
-				posts {
-					postID
-					title
+				users{
+					userID
+					username
+					email
+					posts {
+						postID
+						title
+					}
 				}
-			}
-		}`,
+			}`,
 		Variables: nil,
 	}
 
