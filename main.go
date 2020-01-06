@@ -371,11 +371,15 @@ func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	type reqBody struct {
-		Query string `json:"query"`
+	type JSON = map[string]interface{}
+
+	type ClientQuery struct {
+		OperationName string `json:"operationName"`
+		Query         string `json:"query"`
+		Variables     JSON   `json:"variables"`
 	}
 
-	var rBody reqBody
+	var rBody ClientQuery
 
 	err := json.NewDecoder(r.Body).Decode(&rBody)
 
@@ -391,21 +395,13 @@ func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	type JSON = map[string]interface{}
-
-	type ClientQuery struct {
-		OpName    string
-		Query     string
-		Variables JSON
-	}
-
 	q1 := ClientQuery{
-		OpName:    "Users",
-		Query:     rBody.Query,
-		Variables: nil,
+		OperationName: rBody.OperationName,
+		Query:         rBody.Query,
+		Variables:     rBody.Variables,
 	}
 
-	resp1 := schema.Exec(context.Background(), q1.Query, q1.OpName, q1.Variables)
+	resp1 := schema.Exec(context.Background(), q1.Query, q1.OperationName, q1.Variables)
 	if len(resp1.Errors) > 0 {
 		RespondServerError(w)
 		log.Printf("Schema.Exec: %+v", resp1.Errors)
