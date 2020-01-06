@@ -365,7 +365,27 @@ func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	params := r.URL.Query()
+	if r.Body == nil {
+		RespondServerError(w)
+		log.Printf("Request Body: %s", "No query data")
+		return
+	}
+
+	type reqBody struct {
+		Query string `json:"query"`
+	}
+
+	var rBody reqBody
+
+	err := json.NewDecoder(r.Body).Decode(&rBody)
+
+	if err != nil {
+		RespondServerError(w)
+		log.Printf("Error parsing JSON request body")
+		return
+	}
+
+	//params := r.URL.Query()
 	schema, err := graphql.ParseSchema(h.schma, &RootResolver{db: h.db})
 	if err != nil {
 		panic(err)
@@ -381,7 +401,7 @@ func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	q1 := ClientQuery{
 		OpName:    "Users",
-		Query:     params.Get("query"),
+		Query:     rBody.Query,
 		Variables: nil,
 	}
 
@@ -399,7 +419,8 @@ func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-	//fmt.Println(string(json1))
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	fmt.Fprintf(w, string(json1))
 }
@@ -428,7 +449,7 @@ func main() {
 	schemaString := string(bstr)
 
 	r := mux.NewRouter()
-
+	r.PathPrefix(graphqlURL).Handler(&GraphqlHandler{db: db, schma: schemaString})
 	r.PathPrefix(graphqlURL + "/").Handler(&GraphqlHandler{db: db, schma: schemaString})
 
 	http.ListenAndServe(":9990", r)
