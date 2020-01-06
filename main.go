@@ -58,38 +58,6 @@ type PostInput struct {
 	Title string
 }
 
-// Define mock data:
-var users = []*User{
-	{
-		UserID:   graphql.ID("u-001"),
-		Username: "nyxerys",
-		Email:    "nyxerys@nyxerys.com",
-		Posts: []*Post{
-			{PostID: "n-001", Title: "Olá Mundo!"},
-			{PostID: "n-002", Title: "Olá novamente, mundo!"},
-			{PostID: "n-003", Title: "Olá, escuridão!"},
-		},
-	}, {
-		UserID:   graphql.ID("u-002"),
-		Username: "rdnkta",
-		Email:    "rdnkta@rdnkta.com",
-		Posts: []*Post{
-			{PostID: "n-004", Title: "Привіт Світ!"},
-			{PostID: "n-005", Title: "Привіт ще раз, світ!"},
-			{PostID: "n-006", Title: "Привіт, темрява!"},
-		},
-	}, {
-		UserID:   graphql.ID("u-003"),
-		Username: "username_ZAYDEK",
-		Email:    "username_ZAYDEK@zaydek.com",
-		Posts: []*Post{
-			{PostID: "n-007", Title: "Hello, world!"},
-			{PostID: "n-008", Title: "Hello again, world!"},
-			{PostID: "n-009", Title: "Hello, darkness!"},
-		},
-	},
-}
-
 /****
 *********************
 DEFINE THE RESOLVER FOR GRAPHQL
@@ -138,7 +106,7 @@ func (r *RootResolver) Users() ([]*UserResolver, error) {
 			return nil, err
 		}
 
-		userRxs = append(userRxs, &UserResolver{user})
+		userRxs = append(userRxs, &UserResolver{u: user, db: r.db})
 	}
 
 	err = rows.Err()
@@ -170,7 +138,7 @@ func (r *RootResolver) User(args struct{ UserID graphql.ID }) (*UserResolver, er
 		return nil, err
 	}
 
-	return &UserResolver{user}, nil
+	return &UserResolver{u: user, db: r.db}, nil
 }
 
 func (r *RootResolver) Posts(args struct{ UserID graphql.ID }) ([]*PostResolver, error) {
@@ -205,7 +173,7 @@ func (r *RootResolver) Posts(args struct{ UserID graphql.ID }) ([]*PostResolver,
 		postIDStr := strconv.FormatInt(postIDInt, 10)
 		post.PostID = graphql.ID(postIDStr)
 
-		postRxs = append(postRxs, &PostResolver{post})
+		postRxs = append(postRxs, &PostResolver{p: post, db: r.db})
 	}
 
 	err = rows.Err()
@@ -237,7 +205,7 @@ func (r *RootResolver) Post(args struct{ PostID graphql.ID }) (*PostResolver, er
 	postIDStr := strconv.FormatInt(postIDInt, 10)
 	post.PostID = graphql.ID(postIDStr)
 
-	return &PostResolver{post}, nil
+	return &PostResolver{p: post, db: r.db}, nil
 
 }
 
@@ -248,15 +216,36 @@ type CreatePostArgs struct {
 
 func (r *RootResolver) CreatePost(args CreatePostArgs) (*PostResolver, error) {
 
-	var post *Post
-
-	for _, user := range users {
-		// Create a note with a note ID of n-010:
-		post = &Post{PostID: "n-010", Title: args.Post.Title}
-		user.Posts = append(user.Posts, post) // Push note.
+	tx, err := r.db.Begin()
+	if err != nil {
+		return nil, err
 	}
-	// Return note:
-	return &PostResolver{post}, nil
+
+	defer tx.Rollback()
+
+	var postIDInt int64
+
+	err = tx.QueryRow(`
+		INSERT INTO wpa_posts (
+			user_author,
+			title )
+		VALUES (?, ?);
+		SELECT LAST_INSER_ID();
+	`, args.UserID, args.Post.Title).Scan(&postIDInt)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.Commit()
+
+	if err != nil {
+		return nil, err
+	}
+
+	postIDStr := strconv.FormatInt(postIDInt, 10)
+
+	return r.Post(struct{ PostID graphql.ID }{PostID: graphql.ID(postIDStr)})
 
 }
 
@@ -272,7 +261,8 @@ func (r *RootResolver) CreatePost(args CreatePostArgs) (*PostResolver, error) {
  */
 
 type UserResolver struct {
-	u *User
+	u  *User
+	db *sql.DB
 }
 
 func (r *UserResolver) UserID() graphql.ID {
@@ -288,7 +278,7 @@ func (r *UserResolver) Email() string {
 }
 
 func (r *UserResolver) Posts() ([]*PostResolver, error) {
-	rootRxs := &RootResolver{}
+	rootRxs := &RootResolver{db: r.db}
 
 	return rootRxs.Posts(struct{ UserID graphql.ID }{UserID: r.u.UserID})
 }
@@ -303,7 +293,8 @@ func (r *UserResolver) Posts() ([]*PostResolver, error) {
  */
 
 type PostResolver struct {
-	p *Post
+	p  *Post
+	db *sql.DB
 }
 
 func (r *PostResolver) PostID() graphql.ID {
@@ -435,31 +426,31 @@ func main() {
 	}
 
 	fmt.Println(string(json4))
-
-	q5 := ClientQuery{
-		OpName: "CreatePost",
-		Query: `mutation CreatePost($userID: ID!, $post: PostInput!){
-				createPost(userID: $userID, post: $post){
-					postID,
-					title
-				}
-			}`,
-		Variables: JSON{
-			"userID": "u-0003",
-			"post": JSON{
-				"title": "We create a post!",
+	/*
+		q5 := ClientQuery{
+			OpName: "CreatePost",
+			Query: `mutation CreatePost($userID: ID!, $post: PostInput!){
+					createPost(userID: $userID, post: $post){
+						postID,
+						title
+					}
+				}`,
+			Variables: JSON{
+				"userID": "u-0003",
+				"post": JSON{
+					"title": "We create a post!",
+				},
 			},
-		},
-	}
+		}
 
-	resp5 := schema.Exec(ctx, q5.Query, q5.OpName, q5.Variables)
-	json5, err := json.MarshalIndent(resp5, "", "\t")
-	if err != nil {
-		panic(err)
-	}
+		resp5 := schema.Exec(ctx, q5.Query, q5.OpName, q5.Variables)
+		json5, err := json.MarshalIndent(resp5, "", "\t")
+		if err != nil {
+			panic(err)
+		}
 
-	fmt.Println(string(json5))
-
+		fmt.Println(string(json5))
+	*/
 	q6 := ClientQuery{
 		OpName: "Users",
 		Query: `query Users{
