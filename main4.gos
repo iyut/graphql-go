@@ -6,65 +6,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
-	"net/http"
 	"os"
 	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
 	graphql "github.com/graph-gophers/graphql-go"
 )
-
-/****
-*********************
-RESPONSE STATUS URL
-*********************
-****/
-const (
-	StatusCodeOK              = 200
-	StatusCodeBadRequest      = 400
-	StatusCodeUnauthorized    = 401
-	StatusCodeRequestFailed   = 402
-	StatusCodeNotFound        = 404
-	StatusCodeConflict        = 409
-	StatusCodeTooManyRequests = 429
-	StatusCodeServerError     = 500
-)
-
-var Statuses = map[int]string{
-	StatusCodeOK:              "OK",
-	StatusCodeBadRequest:      "Bad Request",
-	StatusCodeUnauthorized:    "Unauthorized",
-	StatusCodeRequestFailed:   "Request Failed",
-	StatusCodeNotFound:        "Not Found",
-	StatusCodeConflict:        "Conflict",
-	StatusCodeTooManyRequests: "Too Many Requests",
-	StatusCodeServerError:     "Server Error",
-}
-
-var (
-	RespondOK              = NewResponder(StatusCodeOK)
-	RespondBadRequest      = NewResponder(StatusCodeBadRequest)
-	RespondUnauthorized    = NewResponder(StatusCodeUnauthorized)
-	RespondRequestFailed   = NewResponder(StatusCodeRequestFailed)
-	RespondNotFound        = NewResponder(StatusCodeNotFound)
-	RespondConflict        = NewResponder(StatusCodeConflict)
-	RespondTooManyRequests = NewResponder(StatusCodeTooManyRequests)
-	RespondServerError     = NewResponder(StatusCodeServerError)
-)
-
-func NewResponder(statusCode int) func(http.ResponseWriter) {
-	respond := func(w http.ResponseWriter) {
-		if statusCode >= 200 && statusCode <= 299 {
-			w.WriteHeader(statusCode)
-			return
-		}
-		status := Statuses[statusCode]
-		http.Error(w, status, statusCode)
-	}
-	return respond
-}
 
 /****
 *********************
@@ -78,7 +25,6 @@ type Settings struct {
 
 type General struct {
 	PrefixURL     string `json:"prefix_url"`
-	GraphqlURL    string `json:"graphql_url"`
 	GraphqlSchema string `json:"graphql_schema"`
 }
 
@@ -348,67 +294,13 @@ func (r *PostResolver) Title() string {
 	return r.p.Title
 }
 
-/****
-*********************
-GRAPHQL URL HANDLER
-*********************
-****/
-type GraphqlHandler struct {
-	db    *sql.DB
-	schma string
-}
-
-func (h *GraphqlHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	if r.Method != http.MethodGet {
-		RespondNotFound(w)
-		return
-	}
-
-	params := r.URL.Query()
-	schema, err := graphql.ParseSchema(h.schma, &RootResolver{db: h.db})
-	if err != nil {
-		panic(err)
-	}
-
-	type JSON = map[string]interface{}
-
-	type ClientQuery struct {
-		OpName    string
-		Query     string
-		Variables JSON
-	}
-
-	q1 := ClientQuery{
-		OpName:    "Users",
-		Query:     params.Get("query"),
-		Variables: nil,
-	}
-
-	resp1 := schema.Exec(context.Background(), q1.Query, q1.OpName, q1.Variables)
-	if len(resp1.Errors) > 0 {
-		RespondServerError(w)
-		log.Printf("Schema.Exec: %+v", resp1.Errors)
-		return
-	}
-
-	json1, err := json.MarshalIndent(resp1, "", "\t")
-	if err != nil {
-		RespondServerError(w)
-		log.Printf("json.MarshalIndent: %s", err)
-		panic(err)
-	}
-
-	//fmt.Println(string(json1))
-
-	fmt.Fprintf(w, string(json1))
-}
-
 func main() {
+
+	ctx := context.Background()
 
 	settings := openJSONFile()
 
-	graphqlURL := settings.General.GraphqlURL
+	//prefixURL := settings.General.PrefixURL
 	dbInfo := settings.DBInfo[0]
 
 	db, err := sql.Open(dbInfo.Name, dbInfo.Username+":"+dbInfo.Password+"@tcp("+dbInfo.Host+":"+dbInfo.Port+")/"+dbInfo.DBName)
@@ -427,11 +319,150 @@ func main() {
 
 	schemaString := string(bstr)
 
-	r := mux.NewRouter()
+	schema, err := graphql.ParseSchema(schemaString, &RootResolver{db: db})
+	if err != nil {
+		panic(err)
+	}
 
-	r.PathPrefix(graphqlURL + "/").Handler(&GraphqlHandler{db: db, schma: schemaString})
+	type JSON = map[string]interface{}
 
-	http.ListenAndServe(":9990", r)
+	type ClientQuery struct {
+		OpName    string
+		Query     string
+		Variables JSON
+	}
+
+	q1 := ClientQuery{
+		OpName: "Users",
+		Query: `query Users{
+			users{
+				userID
+				username
+				email
+			}
+		}`,
+		Variables: nil,
+	}
+
+	resp1 := schema.Exec(ctx, q1.Query, q1.OpName, q1.Variables)
+	json1, err := json.MarshalIndent(resp1, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(json1))
+
+	q2 := ClientQuery{
+		OpName: "User",
+		Query: `query User($userID: ID!){
+			user(userID: $userID){
+				userID
+				username
+				email
+			}
+		}`,
+		Variables: map[string]interface{}{
+			"userID": "1",
+		},
+	}
+
+	resp2 := schema.Exec(ctx, q2.Query, q2.OpName, q2.Variables)
+	json2, err := json.MarshalIndent(resp2, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(json2))
+
+	q3 := ClientQuery{
+		OpName: "Posts",
+		Query: `query Posts($userID: ID!){
+				posts(userID: $userID){
+					postID
+					title
+				}
+			}`,
+		Variables: map[string]interface{}{
+			"userID": "1",
+		},
+	}
+
+	resp3 := schema.Exec(ctx, q3.Query, q3.OpName, q3.Variables)
+	json3, err := json.MarshalIndent(resp3, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(json3))
+
+	q4 := ClientQuery{
+		OpName: "Post",
+		Query: `query Post($postID: ID!){
+				post(postID: $postID){
+					postID
+					title
+				}
+			}`,
+		Variables: map[string]interface{}{
+			"postID": "1",
+		},
+	}
+
+	resp4 := schema.Exec(ctx, q4.Query, q4.OpName, q4.Variables)
+	json4, err := json.MarshalIndent(resp4, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(json4))
+	/*
+		q5 := ClientQuery{
+			OpName: "CreatePost",
+			Query: `mutation CreatePost($userID: ID!, $post: PostInput!){
+						createPost(userID: $userID, post: $post){
+							postID,
+							title
+						}
+					}`,
+			Variables: JSON{
+				"userID": "1",
+				"post": JSON{
+					"title": "We create a post!",
+				},
+			},
+		}
+
+		resp5 := schema.Exec(ctx, q5.Query, q5.OpName, q5.Variables)
+		json5, err := json.MarshalIndent(resp5, "", "\t")
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(string(json5))
+	*/
+	q6 := ClientQuery{
+		OpName: "Users",
+		Query: `query Users{
+				users{
+					userID
+					username
+					email
+					posts {
+						postID
+						title
+					}
+				}
+			}`,
+		Variables: nil,
+	}
+
+	resp6 := schema.Exec(ctx, q6.Query, q6.OpName, q6.Variables)
+	json6, err := json.MarshalIndent(resp6, "", "\t")
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(json6))
 }
 
 func openJSONFile() Settings {
