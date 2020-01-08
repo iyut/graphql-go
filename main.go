@@ -57,7 +57,7 @@ func main() {
 
 	defer db.Close()
 
-	bstr, err := ioutil.ReadFile(settings.General.GraphqlSchema)
+	bstr, err := ioutil.ReadFile(getMainPath() + "main-schema.graphql")
 	if err != nil {
 		panic(err)
 	}
@@ -79,7 +79,7 @@ func main() {
 
 func openJSONFile() Settings {
 
-	jsonFile, err := os.Open("/root/go/bin/settings.json")
+	jsonFile, err := os.Open(getMainPath() + "settings.json")
 
 	if err != nil {
 		fmt.Println(err)
@@ -100,4 +100,9 @@ func openJSONFile() Settings {
 	*/
 
 	return settings
+}
+
+func getMainPath() string {
+	binPath := os.Getenv("GOBIN")
+	return binPath + "/"
 }

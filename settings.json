@@ -1,8 +1,7 @@
 {
 	"general" 	: {
 		"prefix_url" 		: "/api",
-		"graphql_url" 		: "/graphql",
-		"graphql_schema" 	: "/root/go/bin/main-schema.graphql"
+		"graphql_url" 		: "/graphql"
 	},
 	"database" : [
 		{
