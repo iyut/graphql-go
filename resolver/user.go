@@ -3,7 +3,8 @@ package resolver
 import (
 	"database/sql"
 
-	"github.com/graph-gophers/graphql-go"
+	graphql "github.com/graph-gophers/graphql-go"
+	"github.com/iyut/graphql-go/model"
 )
 
 /*
@@ -18,24 +19,24 @@ import (
  */
 
 type UserResolver struct {
-	u  *User
-	db *sql.DB
+	U  *model.User
+	DB *sql.DB
 }
 
 func (r *UserResolver) UserID() graphql.ID {
-	return r.u.UserID
+	return r.U.UserID
 }
 
 func (r *UserResolver) Username() string {
-	return r.u.Username
+	return r.U.Username
 }
 
 func (r *UserResolver) Email() string {
-	return r.u.Email
+	return r.U.Email
 }
 
 func (r *UserResolver) Posts() ([]*PostResolver, error) {
-	rootRxs := &RootResolver{db: r.db}
+	rootRxs := &RootResolver{DB: r.DB}
 
-	return rootRxs.Posts(struct{ UserID graphql.ID }{UserID: r.u.UserID})
+	return rootRxs.Posts(struct{ UserID graphql.ID }{UserID: r.U.UserID})
 }
