@@ -103,6 +103,7 @@ func openJSONFile() Settings {
 }
 
 func getMainPath() string {
-	binPath := os.Getenv("GOBIN")
-	return binPath + "/"
+
+	return "/root/go/bin/"
+
 }
