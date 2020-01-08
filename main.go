@@ -104,6 +104,12 @@ func openJSONFile() Settings {
 
 func getMainPath() string {
 
-	return "/root/go/bin/"
+	pathLocal := "/Users/luthfi/go/bin/"
+	pathServer := "/root/go/bin/"
 
+	if _, err := os.Stat(pathLocal); !os.IsNotExist(err) {
+		return pathLocal
+	}
+
+	return pathServer
 }
