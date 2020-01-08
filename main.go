@@ -2,11 +2,8 @@ package main
 
 import (
 	"database/sql"
-	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 
 	"github.com/iyut/graphql-go/handler"
 	"github.com/iyut/graphql-go/resolver"
@@ -75,41 +72,4 @@ func main() {
 	r.PathPrefix(graphqlURL + "/").Handler(&handler.GraphqlHandler{Schema: schema})
 
 	http.ListenAndServe(":9990", r)
-}
-
-func openJSONFile() Settings {
-
-	jsonFile, err := os.Open(getMainPath() + "settings.json")
-
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	defer jsonFile.Close()
-
-	byteValue, _ := ioutil.ReadAll(jsonFile)
-
-	var settings Settings
-
-	json.Unmarshal(byteValue, &settings)
-
-	/*
-		if err := json.Unmarshal([]byte(settings), &val); err != nil {
-			panic(err)
-		}
-	*/
-
-	return settings
-}
-
-func getMainPath() string {
-
-	pathLocal := "/Users/luthfi/go/bin/"
-	pathServer := "/root/go/bin/"
-
-	if _, err := os.Stat(pathLocal); !os.IsNotExist(err) {
-		return pathLocal
-	}
-
-	return pathServer
 }
