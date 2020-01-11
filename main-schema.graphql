@@ -13,6 +13,7 @@ type User{
 type Post{
 	postID: ID!
 	title: String!
+	postTitle: String!
 }
 
 type Query{
