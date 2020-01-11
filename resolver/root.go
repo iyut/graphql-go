@@ -108,7 +108,7 @@ func (r *RootResolver) Posts(args struct{ UserID graphql.ID }) ([]*PostResolver,
 	for rows.Next() {
 
 		post := &model.Post{}
-		err := rows.Scan(&postIDInt, &post.Title)
+		err := rows.Scan(&postIDInt, &post.PostTitle)
 
 		if err != nil {
 			return nil, err
@@ -140,7 +140,7 @@ func (r *RootResolver) Post(args struct{ PostID graphql.ID }) (*PostResolver, er
 			wpa_posts
 		WHERE
 			ID = ?
-	`, args.PostID).Scan(&postIDInt, &post.Title)
+	`, args.PostID).Scan(&postIDInt, &post.PostTitle)
 
 	if err != nil {
 		return nil, err

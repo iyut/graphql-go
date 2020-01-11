@@ -26,5 +26,5 @@ func (r *PostResolver) PostID() graphql.ID {
 }
 
 func (r *PostResolver) Title() string {
-	return r.P.Title
+	return r.P.PostTitle
 }
