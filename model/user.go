@@ -11,6 +11,8 @@ type User struct {
 	Username          string
 	Email             string
 	UserLogin         string
+	UserPassword      string
+	UserNicename      string
 	UserEmail         string
 	UserURL           string
 	UserRegistered    time.Time
