@@ -17,7 +17,7 @@ type User struct {
 	UserURL           string
 	UserRegistered    time.Time
 	UserActivationKey string
-	UserStatus        string
+	UserStatus        int32
 	DisplayName       string
 	Posts             []*Post
 	UserMeta          []*UserMeta

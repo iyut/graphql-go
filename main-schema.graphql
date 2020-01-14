@@ -7,13 +7,21 @@ type User{
 	userID : ID!
 	username: String!
 	email : String!
+	nicename : String!
+	status : Int!
 	posts : [Post!]!
+}
+
+type UserMeta{
+	uMetaID: ID!
+	userID: ID!
+	metaKey: String!
+	metaValue: String!
 }
 
 type Post{
 	postID: ID!
 	title: String!
-	postTitle: String!
 }
 
 type Query{

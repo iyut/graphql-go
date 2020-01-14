@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/iyut/graphql-go/handler"
 	"github.com/iyut/graphql-go/resolver"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/gorilla/mux"
 	graphql "github.com/graph-gophers/graphql-go"
 )
 

@@ -6,6 +6,7 @@ import (
 
 	graphql "github.com/graph-gophers/graphql-go"
 	"github.com/iyut/graphql-go/model"
+	"github.com/iyut/graphql-go/service"
 )
 
 /*
@@ -26,37 +27,51 @@ func (r *RootResolver) Users() ([]*UserResolver, error) {
 
 	var userRxs []*UserResolver
 
-	rows, err := r.DB.Query(`
-		SELECT
-			ID,
-			user_login,
-			user_email
-		FROM
-			wpa_users
-	`)
+	userService := service.NewUserService(r.DB, "wpa_")
 
-	if err != nil {
-		panic(err)
-	}
+	argsUser := service.ArgsUser{}
+	users, err := userService.GetUsers(argsUser)
 
-	defer rows.Close()
-
-	for rows.Next() {
-
-		user := &model.User{}
-		err := rows.Scan(&user.UserID, &user.Username, &user.Email)
-
-		if err != nil {
-			return nil, err
-		}
-
-		userRxs = append(userRxs, &UserResolver{U: user, DB: r.DB})
-	}
-
-	err = rows.Err()
 	if err != nil {
 		return nil, err
 	}
+
+	for _, user := range users {
+		userRxs = append(userRxs, &UserResolver{U: user, DB: r.DB})
+	}
+	/*
+		rows, err := r.DB.Query(`
+			SELECT
+				ID,
+				user_login,
+				user_email
+			FROM
+				wpa_users
+		`)
+
+		if err != nil {
+			panic(err)
+		}
+
+		defer rows.Close()
+
+		for rows.Next() {
+
+			user := &model.User{}
+			err := rows.Scan(&user.UserID, &user.Username, &user.Email)
+
+			if err != nil {
+				return nil, err
+			}
+
+			userRxs = append(userRxs, &UserResolver{U: user, DB: r.DB})
+		}
+
+		err = rows.Err()
+		if err != nil {
+			return nil, err
+		}
+	*/
 
 	return userRxs, nil
 }

@@ -28,11 +28,31 @@ func (r *UserResolver) UserID() graphql.ID {
 }
 
 func (r *UserResolver) Username() string {
-	return r.U.Username
+
+	if len(r.U.Username) > 0 {
+		return r.U.Username
+	} else {
+		return r.U.UserLogin
+	}
+
 }
 
 func (r *UserResolver) Email() string {
-	return r.U.Email
+
+	if len(r.U.Email) > 0 {
+		return r.U.Email
+	} else {
+		return r.U.UserEmail
+	}
+
+}
+
+func (r *UserResolver) Nicename() string {
+	return r.U.UserNicename
+}
+
+func (r *UserResolver) Status() int32 {
+	return r.U.UserStatus
 }
 
 func (r *UserResolver) Posts() ([]*PostResolver, error) {
