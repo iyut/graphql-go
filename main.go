@@ -41,6 +41,11 @@ type DBInfo struct {
 	DBName   string `json:"dbname"`
 }
 
+/****
+*********************
+MAIN FUNCTION
+*********************
+****/
 func main() {
 
 	settings := openJSONFile()

@@ -3,6 +3,15 @@ schema{
 	mutation: Mutation
 }
 
+type Query{
+	users: [User!]!
+	user(userID: ID!): User!
+	userMetas(userID: ID!): [UserMeta!]!
+	userMeta(uMetaID: ID!): UserMeta!
+	posts(userID: ID!): [Post!]!
+	post(postID: ID!): Post!
+}
+
 type User{
 	userID : ID!
 	username: String!
@@ -22,13 +31,6 @@ type UserMeta{
 type Post{
 	postID: ID!
 	title: String!
-}
-
-type Query{
-	users: [User!]!
-	user(userID: ID!): User!
-	posts(userID: ID!): [Post!]!
-	post(postID: ID!): Post!
 }
 
 input PostInput{
